@@ -117,9 +117,18 @@ function resolveActiveStatus(filePath: string): SessionStatus {
       }
       const lines = content.trimEnd().split('\n');
       for (let i = lines.length - 1; i >= 0; i--) {
-        const parsed = JSON.parse(lines[i]);
-        const type = parsed?.type;
-        if (META_TYPES.has(type)) continue;
+        let parsed: unknown;
+        try {
+          parsed = JSON.parse(lines[i]);
+        } catch {
+          continue;
+        }
+        const entry = parsed as {
+          type?: string;
+          message?: { content?: Array<{ type: string }> };
+        };
+        const type = entry?.type;
+        if (!type || META_TYPES.has(type)) continue;
         if (
           type === 'progress' ||
           type === 'user' ||
@@ -127,15 +136,11 @@ function resolveActiveStatus(filePath: string): SessionStatus {
         )
           return 'running';
         if (type !== 'assistant') return 'running';
-        const contentItems = parsed?.message?.content;
+        const contentItems = entry?.message?.content;
         if (!Array.isArray(contentItems)) return 'running';
-        const hasToolUse = contentItems.some(
-          (c: { type: string }) => c.type === 'tool_use',
-        );
+        const hasToolUse = contentItems.some((c) => c.type === 'tool_use');
         if (hasToolUse) return 'waiting';
-        const hasText = contentItems.some(
-          (c: { type: string }) => c.type === 'text',
-        );
+        const hasText = contentItems.some((c) => c.type === 'text');
         return hasText ? 'idle' : 'running';
       }
       return 'running';
