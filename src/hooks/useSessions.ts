@@ -38,7 +38,7 @@ function parseJsonlMetadata(filePath: string): JsonlMetadata {
       }
       if (type === 'user') {
         if (parsed.gitBranch) gitBranch = parsed.gitBranch;
-        if (parsed.cwd) cwd = parsed.cwd;
+        if (!cwd && parsed.cwd) cwd = parsed.cwd;
       }
     }
   } catch {
