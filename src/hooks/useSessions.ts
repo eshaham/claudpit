@@ -2,7 +2,7 @@ import { readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { useEffect, useState } from 'react';
 
-import type { SessionIndexEntry, SessionRow } from '~/types.js';
+import type { SessionIndex, SessionRow } from '~/types.js';
 import {
   determineStatus,
   getActiveSessionIds,
@@ -31,18 +31,18 @@ function fetchSessions(): SessionRow[] {
 
   for (const dir of projectDirs) {
     const indexPath = join(CLAUDE_DIR, dir, 'sessions-index.json');
-    let entries: SessionIndexEntry[];
+    let index: SessionIndex;
     try {
-      entries = JSON.parse(readFileSync(indexPath, 'utf-8'));
+      index = JSON.parse(readFileSync(indexPath, 'utf-8'));
     } catch {
       continue;
     }
 
-    for (const entry of entries) {
+    for (const entry of index.entries) {
       const modified = new Date(entry.modified);
       if (now - modified.getTime() > STALE_THRESHOLD) continue;
 
-      const sessionPath = join(CLAUDE_DIR, dir, `${entry.sessionId}.jsonl`);
+      const sessionPath = entry.fullPath;
       const lastRole = getLastMessageRole(sessionPath);
       const status = determineStatus(entry.sessionId, activeIds, lastRole);
       const projectName =

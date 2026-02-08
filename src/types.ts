@@ -12,10 +12,16 @@ export interface SessionRow {
 
 export interface SessionIndexEntry {
   sessionId: string;
+  fullPath: string;
   gitBranch: string;
   projectPath: string;
   modified: string;
   messageCount: number;
   created: string;
   isSidechain: boolean;
+}
+
+export interface SessionIndex {
+  version: number;
+  entries: SessionIndexEntry[];
 }

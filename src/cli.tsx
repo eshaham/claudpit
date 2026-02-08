@@ -2,8 +2,12 @@
 import { Box, Text, render, useApp, useInput } from 'ink';
 import React from 'react';
 
+import { SessionTable } from '~/components/SessionTable.js';
+import { useSessions } from '~/hooks/useSessions.js';
+
 const App = () => {
   const { exit } = useApp();
+  const sessions = useSessions();
 
   useInput((input) => {
     if (input === 'q') {
@@ -13,8 +17,10 @@ const App = () => {
 
   return (
     <Box flexDirection="column">
-      <Text>Hello, Claude HUD!</Text>
-      <Text dimColor>Press 'q' to quit</Text>
+      <SessionTable sessions={sessions} />
+      <Box marginTop={1}>
+        <Text dimColor>Press 'q' to quit | Auto-refresh: 5s</Text>
+      </Box>
     </Box>
   );
 };
