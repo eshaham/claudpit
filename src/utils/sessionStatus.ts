@@ -95,7 +95,7 @@ const META_TYPES = new Set([
   'system',
 ]);
 
-export function isWaitingForInput(filePath: string): boolean {
+function resolveActiveStatus(filePath: string): SessionStatus {
   try {
     const content = readFileSync(filePath, 'utf-8').trimEnd();
     const lines = content.split('\n');
@@ -103,17 +103,22 @@ export function isWaitingForInput(filePath: string): boolean {
       const parsed = JSON.parse(lines[i]);
       const type = parsed?.type;
       if (META_TYPES.has(type)) continue;
-      if (type === 'progress' || type === 'user') return false;
-      if (type !== 'assistant') return false;
+      if (type === 'progress' || type === 'user') return 'running';
+      if (type !== 'assistant') return 'running';
       const contentItems = parsed?.message?.content;
-      if (!Array.isArray(contentItems)) return false;
-      return contentItems.some(
-        (c: { type: string }) => c.type === 'text' || c.type === 'tool_use',
+      if (!Array.isArray(contentItems)) return 'running';
+      const hasToolUse = contentItems.some(
+        (c: { type: string }) => c.type === 'tool_use',
       );
+      if (hasToolUse) return 'waiting';
+      const hasText = contentItems.some(
+        (c: { type: string }) => c.type === 'text',
+      );
+      return hasText ? 'idle' : 'running';
     }
-    return false;
+    return 'running';
   } catch {
-    return false;
+    return 'running';
   }
 }
 
@@ -123,5 +128,5 @@ export function determineStatus(
   filePath: string,
 ): SessionStatus {
   if (!activeSessionIds.has(sessionId)) return 'inactive';
-  return isWaitingForInput(filePath) ? 'waiting' : 'running';
+  return resolveActiveStatus(filePath);
 }

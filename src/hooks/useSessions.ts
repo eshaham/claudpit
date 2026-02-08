@@ -143,7 +143,7 @@ function fetchSessions(): SessionRow[] {
     }
   }
 
-  const statusPriority = { running: 0, waiting: 1, inactive: 2 };
+  const statusPriority = { running: 0, waiting: 1, idle: 2, inactive: 3 };
   sessions.sort(
     (a, b) =>
       statusPriority[a.status] - statusPriority[b.status] ||
