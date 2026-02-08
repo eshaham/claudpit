@@ -4,6 +4,9 @@
   "description": "Dashboard for monitoring Claude Code sessions",
   "type": "module",
   "main": "dist/cli.js",
+  "bin": {
+    "claudpit": "./dist/cli.js"
+  },
   "scripts": {
     "dev": "tsx src/cli.ts",
     "build": "tsc",
