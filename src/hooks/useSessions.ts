@@ -10,13 +10,9 @@ import { join } from 'node:path';
 import { useEffect, useState } from 'react';
 
 import type { SessionIndex, SessionIndexEntry, SessionRow } from '~/types.js';
+import { CLAUDE_PROJECTS_DIR } from '~/utils/paths.js';
 import { determineStatus, getActiveSessionIds } from '~/utils/sessionStatus.js';
 
-const CLAUDE_DIR = join(
-  process.env.HOME ?? process.env.USERPROFILE ?? '',
-  '.claude',
-  'projects',
-);
 const RENDER_INTERVAL = 200;
 const FULL_SCAN_INTERVAL = 5000;
 const STALE_THRESHOLD = 24 * 60 * 60 * 1000;
@@ -227,21 +223,21 @@ function fullScan(): SessionRow[] {
   indexCache.clear();
   metadataCache.clear();
 
-  watchDir(CLAUDE_DIR);
+  watchDir(CLAUDE_PROJECTS_DIR);
 
   const sessions: CachedSession[] = [];
-  const activeDirs = new Set<string>([CLAUDE_DIR]);
+  const activeDirs = new Set<string>([CLAUDE_PROJECTS_DIR]);
 
   let projectDirs: string[];
   try {
-    projectDirs = readdirSync(CLAUDE_DIR);
+    projectDirs = readdirSync(CLAUDE_PROJECTS_DIR);
   } catch {
     cachedSessions = [];
     return [];
   }
 
   for (const dir of projectDirs) {
-    const dirPath = join(CLAUDE_DIR, dir);
+    const dirPath = join(CLAUDE_PROJECTS_DIR, dir);
     activeDirs.add(dirPath);
     watchDir(dirPath);
     const indexData = loadIndex(dirPath);

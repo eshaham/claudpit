@@ -10,12 +10,7 @@ import {
 import { join } from 'node:path';
 
 import type { SessionStatus } from '~/types.js';
-
-const CLAUDE_DIR = join(
-  process.env.HOME ?? process.env.USERPROFILE ?? '',
-  '.claude',
-  'projects',
-);
+import { CLAUDE_PROJECTS_DIR } from '~/utils/paths.js';
 
 function getProcessStartEpoch(pid: string): number | undefined {
   try {
@@ -47,7 +42,7 @@ function matchSessionByBirthTime(
   processStartMs: number,
 ): string | undefined {
   const dirName = '-' + cwd.slice(1).replaceAll('/', '-');
-  const dirPath = join(CLAUDE_DIR, dirName);
+  const dirPath = join(CLAUDE_PROJECTS_DIR, dirName);
   try {
     let bestId: string | undefined;
     let bestDiff = Infinity;
