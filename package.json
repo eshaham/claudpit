@@ -2,11 +2,24 @@
   "name": "claudpit",
   "version": "1.0.0",
   "description": "Dashboard for monitoring Claude Code sessions",
-  "main": "index.js",
+  "type": "module",
+  "main": "dist/cli.js",
   "scripts": {
+    "dev": "tsx src/cli.ts",
+    "build": "tsc",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
-  "keywords": ["claude", "tui", "dashboard", "sessions"],
+  "keywords": [
+    "claude",
+    "tui",
+    "dashboard",
+    "sessions"
+  ],
   "author": "",
-  "license": "ISC"
+  "license": "ISC",
+  "devDependencies": {
+    "@types/node": "^25.2.2",
+    "tsx": "^4.21.0",
+    "typescript": "^5.9.3"
+  }
 }
