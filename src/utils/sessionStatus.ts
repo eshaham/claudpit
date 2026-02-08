@@ -54,7 +54,7 @@ function matchSessionByBirthTime(
       if (!f.endsWith('.jsonl')) continue;
       const birthMs = statSync(join(dirPath, f)).birthtimeMs;
       const diff = birthMs - processStartMs;
-      if (diff >= -5000 && diff < bestDiff) {
+      if (diff >= -5000 && diff <= 30000 && diff < bestDiff) {
         bestDiff = diff;
         bestId = f.replace('.jsonl', '');
       }
