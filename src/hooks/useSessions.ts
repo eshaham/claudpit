@@ -11,8 +11,28 @@ const CLAUDE_DIR = join(
   '.claude',
   'projects',
 );
-const REFRESH_INTERVAL = 5000;
+const REFRESH_INTERVAL = 1000;
+const FULL_SCAN_INTERVAL = 5000;
 const STALE_THRESHOLD = 24 * 60 * 60 * 1000;
+
+let lastFullScanMs = 0;
+let cachedActiveIds = new Set<string>();
+
+interface CachedSession {
+  filePath: string;
+  sessionId: string;
+  mtimeMs: number;
+  row: SessionRow;
+}
+
+let cachedSessions: CachedSession[] = [];
+const projectNameCache = new Map<string, string>();
+const gitBranchCache = new Map<string, string>();
+const indexCache = new Map<string, { mtimeMs: number; data: IndexData }>();
+const metadataCache = new Map<
+  string,
+  { mtimeMs: number; meta: JsonlMetadata }
+>();
 
 function deriveProjectPath(dirName: string): string {
   return dirName.replace(/^-/, '/').replaceAll('-', '/');
@@ -24,7 +44,10 @@ interface JsonlMetadata {
   cwd: string | undefined;
 }
 
-function parseJsonlMetadata(filePath: string): JsonlMetadata {
+function parseJsonlMetadata(filePath: string, mtimeMs: number): JsonlMetadata {
+  const cached = metadataCache.get(filePath);
+  if (cached && cached.mtimeMs === mtimeMs) return cached.meta;
+
   let messageCount = 0;
   let gitBranch: string | undefined;
   let cwd: string | undefined;
@@ -44,7 +67,9 @@ function parseJsonlMetadata(filePath: string): JsonlMetadata {
   } catch {
     // ignore
   }
-  return { messageCount, gitBranch, cwd };
+  const meta = { messageCount, gitBranch, cwd };
+  metadataCache.set(filePath, { mtimeMs, meta });
+  return meta;
 }
 
 const MANIFEST_READERS: Array<{
@@ -87,27 +112,40 @@ const MANIFEST_READERS: Array<{
 ];
 
 function resolveProjectName(projectPath: string): string {
+  const cached = projectNameCache.get(projectPath);
+  if (cached !== undefined) return cached;
+
   for (const { file, extract } of MANIFEST_READERS) {
-    const filePath = join(projectPath, file);
-    if (!existsSync(filePath)) continue;
+    const fp = join(projectPath, file);
+    if (!existsSync(fp)) continue;
     try {
-      const content = readFileSync(filePath, 'utf-8');
+      const content = readFileSync(fp, 'utf-8');
       const name = extract(content);
-      if (name) return name;
+      if (name) {
+        projectNameCache.set(projectPath, name);
+        return name;
+      }
     } catch {
       continue;
     }
   }
-  return projectPath.split('/').pop() ?? projectPath;
+  const fallback = projectPath.split('/').pop() ?? projectPath;
+  projectNameCache.set(projectPath, fallback);
+  return fallback;
 }
 
 function resolveGitBranch(projectPath: string): string | undefined {
+  const cached = gitBranchCache.get(projectPath);
+  if (cached !== undefined) return cached;
+
   try {
-    return execSync('git rev-parse --abbrev-ref HEAD', {
+    const branch = execSync('git rev-parse --abbrev-ref HEAD', {
       cwd: projectPath,
       encoding: 'utf-8',
       stdio: ['pipe', 'pipe', 'pipe'],
     }).trim();
+    gitBranchCache.set(projectPath, branch);
+    return branch;
   } catch {
     return undefined;
   }
@@ -121,27 +159,47 @@ interface IndexData {
 function loadIndex(dirPath: string): IndexData | undefined {
   const indexPath = join(dirPath, 'sessions-index.json');
   try {
+    const { mtimeMs } = statSync(indexPath);
+    const cached = indexCache.get(dirPath);
+    if (cached && cached.mtimeMs === mtimeMs) return cached.data;
+
     const index: SessionIndex = JSON.parse(readFileSync(indexPath, 'utf-8'));
     const entries = new Map<string, SessionIndexEntry>();
     for (const entry of index.entries) {
       entries.set(entry.sessionId, entry);
     }
     const projectPath = index.entries[0]?.projectPath;
-    return { entries, projectPath };
+    const data: IndexData = { entries, projectPath };
+    indexCache.set(dirPath, { mtimeMs, data });
+    return data;
   } catch {
     return undefined;
   }
 }
 
-function fetchSessions(): SessionRow[] {
+const STATUS_PRIORITY = { running: 0, waiting: 1, idle: 2, inactive: 3 };
+
+function sortRows(rows: SessionRow[]): SessionRow[] {
+  return rows.sort(
+    (a, b) =>
+      STATUS_PRIORITY[a.status] - STATUS_PRIORITY[b.status] ||
+      b.lastActive.getTime() - a.lastActive.getTime(),
+  );
+}
+
+function fullScan(): SessionRow[] {
   const now = Date.now();
-  const activeSessionIds = getActiveSessionIds();
-  const sessions: SessionRow[] = [];
+  lastFullScanMs = now;
+  cachedActiveIds = getActiveSessionIds();
+  gitBranchCache.clear();
+
+  const sessions: CachedSession[] = [];
 
   let projectDirs: string[];
   try {
     projectDirs = readdirSync(CLAUDE_DIR);
   } catch {
+    cachedSessions = [];
     return [];
   }
 
@@ -161,31 +219,36 @@ function fetchSessions(): SessionRow[] {
       const filePath = join(dirPath, file);
 
       let mtime: Date;
+      let mtimeMs: number;
       try {
-        mtime = statSync(filePath).mtime;
+        const stat = statSync(filePath);
+        mtime = stat.mtime;
+        mtimeMs = stat.mtimeMs;
       } catch {
         continue;
       }
 
-      const isActive = activeSessionIds.has(sessionId);
+      const isActive = cachedActiveIds.has(sessionId);
       if (!isActive && now - mtime.getTime() > STALE_THRESHOLD) continue;
 
       const indexEntry = indexData?.entries.get(sessionId);
-      const jsonlMeta = indexEntry ? undefined : parseJsonlMetadata(filePath);
+      const jsonlMeta = indexEntry
+        ? undefined
+        : parseJsonlMetadata(filePath, mtimeMs);
       const projectPath =
         indexEntry?.projectPath ??
         jsonlMeta?.cwd ??
         indexData?.projectPath ??
         deriveProjectPath(dir);
       const projectName = resolveProjectName(projectPath);
-      const status = determineStatus(sessionId, activeSessionIds, filePath);
+      const status = determineStatus(sessionId, cachedActiveIds, filePath);
 
       let gitBranch = indexEntry?.gitBranch ?? jsonlMeta?.gitBranch;
       if (!gitBranch || gitBranch === 'HEAD') {
         gitBranch = resolveGitBranch(projectPath) ?? gitBranch ?? 'N/A';
       }
 
-      sessions.push({
+      const row: SessionRow = {
         sessionId,
         projectPath,
         projectName,
@@ -193,17 +256,40 @@ function fetchSessions(): SessionRow[] {
         status,
         lastActive: mtime,
         messageCount: indexEntry?.messageCount ?? jsonlMeta?.messageCount ?? 0,
-      });
+      };
+      sessions.push({ filePath, sessionId, mtimeMs, row });
     }
   }
 
-  const statusPriority = { running: 0, waiting: 1, idle: 2, inactive: 3 };
-  sessions.sort(
-    (a, b) =>
-      statusPriority[a.status] - statusPriority[b.status] ||
-      b.lastActive.getTime() - a.lastActive.getTime(),
-  );
-  return sessions;
+  cachedSessions = sessions;
+  return sortRows(sessions.map((s) => s.row));
+}
+
+function quickScan(): SessionRow[] {
+  for (const cached of cachedSessions) {
+    try {
+      const stat = statSync(cached.filePath);
+      if (stat.mtimeMs !== cached.mtimeMs) {
+        cached.mtimeMs = stat.mtimeMs;
+        const status = determineStatus(
+          cached.sessionId,
+          cachedActiveIds,
+          cached.filePath,
+        );
+        cached.row = { ...cached.row, lastActive: stat.mtime, status };
+      }
+    } catch {
+      // ignore
+    }
+  }
+  return sortRows(cachedSessions.map((s) => s.row));
+}
+
+function fetchSessions(): SessionRow[] {
+  if (Date.now() - lastFullScanMs >= FULL_SCAN_INTERVAL) {
+    return fullScan();
+  }
+  return quickScan();
 }
 
 export function useSessions(): SessionRow[] {

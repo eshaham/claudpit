@@ -1,5 +1,12 @@
 import { execSync } from 'node:child_process';
-import { readFileSync, readdirSync, statSync } from 'node:fs';
+import {
+  closeSync,
+  fstatSync,
+  openSync,
+  readSync,
+  readdirSync,
+  statSync,
+} from 'node:fs';
 import { join } from 'node:path';
 
 import type { SessionStatus } from '~/types.js';
@@ -95,28 +102,45 @@ const META_TYPES = new Set([
   'system',
 ]);
 
+const TAIL_BYTES = 8192;
+
 function resolveActiveStatus(filePath: string): SessionStatus {
   try {
-    const content = readFileSync(filePath, 'utf-8').trimEnd();
-    const lines = content.split('\n');
-    for (let i = lines.length - 1; i >= 0; i--) {
-      const parsed = JSON.parse(lines[i]);
-      const type = parsed?.type;
-      if (META_TYPES.has(type)) continue;
-      if (type === 'progress' || type === 'user') return 'running';
-      if (type !== 'assistant') return 'running';
-      const contentItems = parsed?.message?.content;
-      if (!Array.isArray(contentItems)) return 'running';
-      const hasToolUse = contentItems.some(
-        (c: { type: string }) => c.type === 'tool_use',
-      );
-      if (hasToolUse) return 'waiting';
-      const hasText = contentItems.some(
-        (c: { type: string }) => c.type === 'text',
-      );
-      return hasText ? 'idle' : 'running';
+    const fd = openSync(filePath, 'r');
+    try {
+      const { size } = fstatSync(fd);
+      const readStart = Math.max(0, size - TAIL_BYTES);
+      const readLen = Math.min(TAIL_BYTES, size);
+      if (readLen === 0) return 'running';
+      const buf = Buffer.alloc(readLen);
+      readSync(fd, buf, 0, readLen, readStart);
+      let content = buf.toString('utf-8');
+      if (readStart > 0) {
+        const nl = content.indexOf('\n');
+        if (nl !== -1) content = content.slice(nl + 1);
+      }
+      const lines = content.trimEnd().split('\n');
+      for (let i = lines.length - 1; i >= 0; i--) {
+        const parsed = JSON.parse(lines[i]);
+        const type = parsed?.type;
+        if (META_TYPES.has(type)) continue;
+        if (type === 'progress' || type === 'user') return 'running';
+        if (type !== 'assistant') return 'running';
+        const contentItems = parsed?.message?.content;
+        if (!Array.isArray(contentItems)) return 'running';
+        const hasToolUse = contentItems.some(
+          (c: { type: string }) => c.type === 'tool_use',
+        );
+        if (hasToolUse) return 'waiting';
+        const hasText = contentItems.some(
+          (c: { type: string }) => c.type === 'text',
+        );
+        return hasText ? 'idle' : 'running';
+      }
+      return 'running';
+    } finally {
+      closeSync(fd);
     }
-    return 'running';
   } catch {
     return 'running';
   }
