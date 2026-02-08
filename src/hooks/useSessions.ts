@@ -1,5 +1,5 @@
 import { execSync } from 'node:child_process';
-import { readFileSync, readdirSync, statSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import { useEffect, useState } from 'react';
 
@@ -45,6 +45,60 @@ function parseJsonlMetadata(filePath: string): JsonlMetadata {
     // ignore
   }
   return { messageCount, gitBranch, cwd };
+}
+
+const MANIFEST_READERS: Array<{
+  file: string;
+  extract: (content: string) => string | undefined;
+}> = [
+  {
+    file: 'package.json',
+    extract: (c) => {
+      try {
+        return JSON.parse(c).name || undefined;
+      } catch {
+        return undefined;
+      }
+    },
+  },
+  {
+    file: 'Cargo.toml',
+    extract: (c) => c.match(/^\s*name\s*=\s*"([^"]+)"/m)?.[1],
+  },
+  {
+    file: 'pyproject.toml',
+    extract: (c) => c.match(/^\s*name\s*=\s*"([^"]+)"/m)?.[1],
+  },
+  {
+    file: 'go.mod',
+    extract: (c) => {
+      const mod = c.match(/^module\s+(\S+)/m)?.[1];
+      return mod?.split('/').pop();
+    },
+  },
+  {
+    file: 'settings.gradle',
+    extract: (c) => c.match(/rootProject\.name\s*=\s*['"]([^'"]+)['"]/)?.[1],
+  },
+  {
+    file: 'settings.gradle.kts',
+    extract: (c) => c.match(/rootProject\.name\s*=\s*"([^"]+)"/)?.[1],
+  },
+];
+
+function resolveProjectName(projectPath: string): string {
+  for (const { file, extract } of MANIFEST_READERS) {
+    const filePath = join(projectPath, file);
+    if (!existsSync(filePath)) continue;
+    try {
+      const content = readFileSync(filePath, 'utf-8');
+      const name = extract(content);
+      if (name) return name;
+    } catch {
+      continue;
+    }
+  }
+  return projectPath.split('/').pop() ?? projectPath;
 }
 
 function resolveGitBranch(projectPath: string): string | undefined {
@@ -123,7 +177,7 @@ function fetchSessions(): SessionRow[] {
         jsonlMeta?.cwd ??
         indexData?.projectPath ??
         deriveProjectPath(dir);
-      const projectName = projectPath.split('/').pop() ?? projectPath;
+      const projectName = resolveProjectName(projectPath);
       const status = determineStatus(sessionId, activeSessionIds, filePath);
 
       let gitBranch = indexEntry?.gitBranch ?? jsonlMeta?.gitBranch;
