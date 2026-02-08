@@ -1,3 +1,4 @@
+import { execSync } from 'node:child_process';
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import { useEffect, useState } from 'react';
@@ -21,12 +22,44 @@ function deriveProjectPath(dirName: string): string {
   return dirName.replace(/^-/, '/').replaceAll('-', '/');
 }
 
-function countMessages(filePath: string): number {
+interface JsonlMetadata {
+  messageCount: number;
+  gitBranch: string | undefined;
+  cwd: string | undefined;
+}
+
+function parseJsonlMetadata(filePath: string): JsonlMetadata {
+  let messageCount = 0;
+  let gitBranch: string | undefined;
+  let cwd: string | undefined;
   try {
     const content = readFileSync(filePath, 'utf-8').trimEnd();
-    return content.split('\n').length;
+    for (const line of content.split('\n')) {
+      const parsed = JSON.parse(line);
+      const type = parsed?.type;
+      if (type === 'user' || type === 'assistant') {
+        messageCount++;
+      }
+      if (type === 'user') {
+        if (parsed.gitBranch) gitBranch = parsed.gitBranch;
+        if (parsed.cwd) cwd = parsed.cwd;
+      }
+    }
   } catch {
-    return 0;
+    // ignore
+  }
+  return { messageCount, gitBranch, cwd };
+}
+
+function resolveGitBranch(projectPath: string): string | undefined {
+  try {
+    return execSync('git rev-parse --abbrev-ref HEAD', {
+      cwd: projectPath,
+      encoding: 'utf-8',
+      stdio: ['pipe', 'pipe', 'pipe'],
+    }).trim();
+  } catch {
+    return undefined;
   }
 }
 
@@ -52,7 +85,7 @@ function loadIndex(dirPath: string): IndexData | undefined {
 
 function fetchSessions(): SessionRow[] {
   const now = Date.now();
-  const activeIds = getActiveSessionIds();
+  const activeSessionIds = getActiveSessionIds();
   const sessions: SessionRow[] = [];
 
   let projectDirs: string[];
@@ -87,22 +120,29 @@ function fetchSessions(): SessionRow[] {
       if (now - mtime.getTime() > STALE_THRESHOLD) continue;
 
       const indexEntry = indexData?.entries.get(sessionId);
-      const lastRole = getLastMessageRole(filePath);
-      const status = determineStatus(sessionId, activeIds, lastRole);
+      const jsonlMeta = indexEntry ? undefined : parseJsonlMetadata(filePath);
       const projectPath =
         indexEntry?.projectPath ??
+        jsonlMeta?.cwd ??
         indexData?.projectPath ??
         deriveProjectPath(dir);
       const projectName = projectPath.split('/').pop() ?? projectPath;
+      const lastRole = getLastMessageRole(filePath);
+      const status = determineStatus(sessionId, activeSessionIds, lastRole);
+
+      let gitBranch = indexEntry?.gitBranch ?? jsonlMeta?.gitBranch;
+      if (!gitBranch || gitBranch === 'HEAD') {
+        gitBranch = resolveGitBranch(projectPath) ?? gitBranch ?? 'N/A';
+      }
 
       sessions.push({
         sessionId,
         projectPath,
         projectName,
-        gitBranch: indexEntry?.gitBranch ?? 'N/A',
+        gitBranch,
         status,
         lastActive: mtime,
-        messageCount: indexEntry?.messageCount ?? countMessages(filePath),
+        messageCount: indexEntry?.messageCount ?? jsonlMeta?.messageCount ?? 0,
       });
     }
   }
