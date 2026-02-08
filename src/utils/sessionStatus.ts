@@ -96,11 +96,7 @@ export function getActiveSessionIds(): Set<string> {
   return sessionIds;
 }
 
-const META_TYPES = new Set([
-  'queue-operation',
-  'file-history-snapshot',
-  'system',
-]);
+const META_TYPES = new Set(['file-history-snapshot', 'system']);
 
 const TAIL_BYTES = 8192;
 
@@ -124,7 +120,12 @@ function resolveActiveStatus(filePath: string): SessionStatus {
         const parsed = JSON.parse(lines[i]);
         const type = parsed?.type;
         if (META_TYPES.has(type)) continue;
-        if (type === 'progress' || type === 'user') return 'running';
+        if (
+          type === 'progress' ||
+          type === 'user' ||
+          type === 'queue-operation'
+        )
+          return 'running';
         if (type !== 'assistant') return 'running';
         const contentItems = parsed?.message?.content;
         if (!Array.isArray(contentItems)) return 'running';
