@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import { Box, Text, render, useApp, useInput } from 'ink';
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 
 import { SessionTable } from '~/components/SessionTable.js';
 import { useSessions } from '~/hooks/useSessions.js';
@@ -15,6 +15,16 @@ const App = () => {
       showInactive ? sessions : sessions.filter((s) => s.status !== 'inactive'),
     [sessions, showInactive],
   );
+
+  useEffect(() => {
+    const onResize = () => {
+      process.stdout.write('\x1b[2J\x1b[H');
+    };
+    process.stdout.on('resize', onResize);
+    return () => {
+      process.stdout.off('resize', onResize);
+    };
+  }, []);
 
   useInput((input) => {
     if (input === 'q') {
