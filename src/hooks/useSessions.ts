@@ -346,17 +346,16 @@ function fetchSessions(): SessionRow[] {
 
 export function useSessions(): SessionRow[] {
   const [sessions, setSessions] = useState<SessionRow[]>(() => {
-    const result = fetchSessions();
     dirty = false;
-    return result;
+    return fetchSessions();
   });
 
   useEffect(() => {
     const interval = setInterval(() => {
       const needsFullScan = Date.now() - lastFullScanMs >= FULL_SCAN_INTERVAL;
       if (needsFullScan || dirty) {
-        setSessions(fetchSessions());
         dirty = false;
+        setSessions(fetchSessions());
       }
     }, RENDER_INTERVAL);
 
