@@ -223,6 +223,9 @@ function fullScan(): SessionRow[] {
   lastFullScanMs = now;
   cachedActiveIds = getActiveSessionIds();
   gitBranchCache.clear();
+  projectNameCache.clear();
+  indexCache.clear();
+  metadataCache.clear();
 
   watchDir(CLAUDE_DIR);
 
