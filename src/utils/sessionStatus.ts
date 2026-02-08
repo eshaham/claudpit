@@ -89,28 +89,39 @@ export function getActiveSessionIds(): Set<string> {
   return sessionIds;
 }
 
-export function getLastMessageRole(
-  sessionPath: string,
-): 'user' | 'assistant' | null {
+const META_TYPES = new Set([
+  'queue-operation',
+  'file-history-snapshot',
+  'system',
+]);
+
+export function isWaitingForInput(filePath: string): boolean {
   try {
-    const content = readFileSync(sessionPath, 'utf-8').trimEnd();
+    const content = readFileSync(filePath, 'utf-8').trimEnd();
     const lines = content.split('\n');
     for (let i = lines.length - 1; i >= 0; i--) {
       const parsed = JSON.parse(lines[i]);
-      const role = parsed?.message?.role;
-      if (role === 'user' || role === 'assistant') return role;
+      const type = parsed?.type;
+      if (META_TYPES.has(type)) continue;
+      if (type === 'progress' || type === 'user') return false;
+      if (type !== 'assistant') return false;
+      const contentItems = parsed?.message?.content;
+      if (!Array.isArray(contentItems)) return false;
+      return contentItems.some(
+        (c: { type: string }) => c.type === 'text' || c.type === 'tool_use',
+      );
     }
-    return null;
+    return false;
   } catch {
-    return null;
+    return false;
   }
 }
 
 export function determineStatus(
   sessionId: string,
   activeSessionIds: Set<string>,
-  lastMessageRole: 'user' | 'assistant' | null,
+  filePath: string,
 ): SessionStatus {
   if (!activeSessionIds.has(sessionId)) return 'stale';
-  return lastMessageRole === 'assistant' ? 'waiting' : 'running';
+  return isWaitingForInput(filePath) ? 'waiting' : 'running';
 }

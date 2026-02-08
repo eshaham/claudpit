@@ -4,11 +4,7 @@ import { join } from 'node:path';
 import { useEffect, useState } from 'react';
 
 import type { SessionIndex, SessionIndexEntry, SessionRow } from '~/types.js';
-import {
-  determineStatus,
-  getActiveSessionIds,
-  getLastMessageRole,
-} from '~/utils/sessionStatus.js';
+import { determineStatus, getActiveSessionIds } from '~/utils/sessionStatus.js';
 
 const CLAUDE_DIR = join(
   process.env.HOME ?? process.env.USERPROFILE ?? '',
@@ -127,8 +123,7 @@ function fetchSessions(): SessionRow[] {
         indexData?.projectPath ??
         deriveProjectPath(dir);
       const projectName = projectPath.split('/').pop() ?? projectPath;
-      const lastRole = getLastMessageRole(filePath);
-      const status = determineStatus(sessionId, activeSessionIds, lastRole);
+      const status = determineStatus(sessionId, activeSessionIds, filePath);
 
       let gitBranch = indexEntry?.gitBranch ?? jsonlMeta?.gitBranch;
       if (!gitBranch || gitBranch === 'HEAD') {
