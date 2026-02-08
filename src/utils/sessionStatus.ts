@@ -149,6 +149,22 @@ function resolveActiveStatus(filePath: string): SessionStatus {
 }
 
 const RECENT_THRESHOLD = 3000;
+const SUBAGENT_THRESHOLD = 60000;
+
+function hasActiveSubagent(filePath: string): boolean {
+  const subagentsDir = join(filePath.replace('.jsonl', ''), 'subagents');
+  try {
+    const now = Date.now();
+    for (const f of readdirSync(subagentsDir)) {
+      if (!f.endsWith('.jsonl')) continue;
+      if (now - statSync(join(subagentsDir, f)).mtimeMs < SUBAGENT_THRESHOLD)
+        return true;
+    }
+  } catch {
+    return false;
+  }
+  return false;
+}
 
 export function determineStatus(
   sessionId: string,
@@ -160,6 +176,10 @@ export function determineStatus(
   const status = resolveActiveStatus(filePath);
   if (status === 'idle' && Date.now() - mtimeMs < RECENT_THRESHOLD) {
     return 'running';
+  }
+  if (status === 'waiting') {
+    if (Date.now() - mtimeMs < RECENT_THRESHOLD) return 'running';
+    if (hasActiveSubagent(filePath)) return 'running';
   }
   return status;
 }
