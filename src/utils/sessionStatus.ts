@@ -122,6 +122,6 @@ export function determineStatus(
   activeSessionIds: Set<string>,
   filePath: string,
 ): SessionStatus {
-  if (!activeSessionIds.has(sessionId)) return 'stale';
+  if (!activeSessionIds.has(sessionId)) return 'inactive';
   return isWaitingForInput(filePath) ? 'waiting' : 'running';
 }

@@ -28,7 +28,7 @@ function getColumnWidths() {
 const STATUS_CONFIG = {
   running: { icon: '\u{1F7E2}', label: 'Running' },
   waiting: { icon: '\u{1F7E1}', label: 'Waiting' },
-  stale: { icon: '\u{1F534}', label: 'Stale' },
+  inactive: { icon: '\u{1F534}', label: 'Inactive' },
 } as const;
 
 function StatusCell({ status }: { status: SessionRow['status'] }) {

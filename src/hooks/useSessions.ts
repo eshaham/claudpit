@@ -113,7 +113,8 @@ function fetchSessions(): SessionRow[] {
         continue;
       }
 
-      if (now - mtime.getTime() > STALE_THRESHOLD) continue;
+      const isActive = activeSessionIds.has(sessionId);
+      if (!isActive && now - mtime.getTime() > STALE_THRESHOLD) continue;
 
       const indexEntry = indexData?.entries.get(sessionId);
       const jsonlMeta = indexEntry ? undefined : parseJsonlMetadata(filePath);
@@ -142,7 +143,12 @@ function fetchSessions(): SessionRow[] {
     }
   }
 
-  sessions.sort((a, b) => b.lastActive.getTime() - a.lastActive.getTime());
+  const statusPriority = { running: 0, waiting: 1, inactive: 2 };
+  sessions.sort(
+    (a, b) =>
+      statusPriority[a.status] - statusPriority[b.status] ||
+      b.lastActive.getTime() - a.lastActive.getTime(),
+  );
   return sessions;
 }
 
