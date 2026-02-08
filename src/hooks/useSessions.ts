@@ -211,7 +211,7 @@ function loadIndex(dirPath: string): IndexData | undefined {
 const STATUS_PRIORITY = { running: 0, waiting: 1, idle: 2, inactive: 3 };
 
 function sortRows(rows: SessionRow[]): SessionRow[] {
-  return rows.sort(
+  return [...rows].sort(
     (a, b) =>
       STATUS_PRIORITY[a.status] - STATUS_PRIORITY[b.status] ||
       b.lastActive.getTime() - a.lastActive.getTime(),
