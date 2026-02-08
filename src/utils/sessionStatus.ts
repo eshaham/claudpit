@@ -1,4 +1,4 @@
-import { execSync } from 'node:child_process';
+import { execFileSync, execSync } from 'node:child_process';
 import {
   closeSync,
   fstatSync,
@@ -19,7 +19,7 @@ const CLAUDE_DIR = join(
 
 function getProcessStartEpoch(pid: string): number | undefined {
   try {
-    const lstart = execSync(`ps -p ${pid} -o lstart=`, {
+    const lstart = execFileSync('ps', ['-p', pid, '-o', 'lstart='], {
       encoding: 'utf-8',
       stdio: ['pipe', 'pipe', 'pipe'],
     }).trim();
@@ -32,8 +32,9 @@ function getProcessStartEpoch(pid: string): number | undefined {
 
 function getProcessCwd(pid: string): string | undefined {
   try {
-    const out = execSync(`lsof -a -p ${pid} -d cwd -Fn 2>/dev/null`, {
+    const out = execFileSync('lsof', ['-a', '-p', pid, '-d', 'cwd', '-Fn'], {
       encoding: 'utf-8',
+      stdio: ['pipe', 'pipe', 'pipe'],
     });
     return out.match(/n(.+)/)?.[1];
   } catch {
