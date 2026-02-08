@@ -1,5 +1,11 @@
 import { execSync } from 'node:child_process';
-import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
+import {
+  existsSync,
+  readFileSync,
+  readdirSync,
+  statSync,
+  watch,
+} from 'node:fs';
 import { join } from 'node:path';
 import { useEffect, useState } from 'react';
 
@@ -11,12 +17,13 @@ const CLAUDE_DIR = join(
   '.claude',
   'projects',
 );
-const REFRESH_INTERVAL = 1000;
+const RENDER_INTERVAL = 200;
 const FULL_SCAN_INTERVAL = 5000;
 const STALE_THRESHOLD = 24 * 60 * 60 * 1000;
 
 let lastFullScanMs = 0;
 let cachedActiveIds = new Set<string>();
+let dirty = true;
 
 interface CachedSession {
   filePath: string;
@@ -33,6 +40,30 @@ const metadataCache = new Map<
   string,
   { mtimeMs: number; meta: JsonlMetadata }
 >();
+const dirWatchers = new Map<string, ReturnType<typeof watch>>();
+
+function markDirty() {
+  dirty = true;
+}
+
+function watchDir(dirPath: string) {
+  if (dirWatchers.has(dirPath)) return;
+  try {
+    const watcher = watch(dirPath, markDirty);
+    watcher.on('error', () => {
+      watcher.close();
+      dirWatchers.delete(dirPath);
+    });
+    dirWatchers.set(dirPath, watcher);
+  } catch {
+    // ignore
+  }
+}
+
+function closeAllWatchers() {
+  for (const w of dirWatchers.values()) w.close();
+  dirWatchers.clear();
+}
 
 function deriveProjectPath(dirName: string): string {
   return dirName.replace(/^-/, '/').replaceAll('-', '/');
@@ -193,7 +224,10 @@ function fullScan(): SessionRow[] {
   cachedActiveIds = getActiveSessionIds();
   gitBranchCache.clear();
 
+  watchDir(CLAUDE_DIR);
+
   const sessions: CachedSession[] = [];
+  const activeDirs = new Set<string>([CLAUDE_DIR]);
 
   let projectDirs: string[];
   try {
@@ -205,6 +239,8 @@ function fullScan(): SessionRow[] {
 
   for (const dir of projectDirs) {
     const dirPath = join(CLAUDE_DIR, dir);
+    activeDirs.add(dirPath);
+    watchDir(dirPath);
     const indexData = loadIndex(dirPath);
 
     let files: string[];
@@ -261,6 +297,13 @@ function fullScan(): SessionRow[] {
     }
   }
 
+  for (const [path, watcher] of dirWatchers) {
+    if (!activeDirs.has(path)) {
+      watcher.close();
+      dirWatchers.delete(path);
+    }
+  }
+
   cachedSessions = sessions;
   return sortRows(sessions.map((s) => s.row));
 }
@@ -293,13 +336,25 @@ function fetchSessions(): SessionRow[] {
 }
 
 export function useSessions(): SessionRow[] {
-  const [sessions, setSessions] = useState<SessionRow[]>(() => fetchSessions());
+  const [sessions, setSessions] = useState<SessionRow[]>(() => {
+    const result = fetchSessions();
+    dirty = false;
+    return result;
+  });
 
   useEffect(() => {
     const interval = setInterval(() => {
-      setSessions(fetchSessions());
-    }, REFRESH_INTERVAL);
-    return () => clearInterval(interval);
+      const needsFullScan = Date.now() - lastFullScanMs >= FULL_SCAN_INTERVAL;
+      if (needsFullScan || dirty) {
+        setSessions(fetchSessions());
+        dirty = false;
+      }
+    }, RENDER_INTERVAL);
+
+    return () => {
+      clearInterval(interval);
+      closeAllWatchers();
+    };
   }, []);
 
   return sessions;

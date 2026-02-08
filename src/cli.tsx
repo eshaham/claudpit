@@ -41,7 +41,7 @@ const App = () => {
       <Box marginTop={inactiveCount > 0 && !showInactive ? 0 : 1}>
         <Text dimColor>
           'q' quit | 'i' {showInactive ? 'hide' : 'show'} inactive |
-          Auto-refresh: 1s
+          Auto-refresh
         </Text>
       </Box>
     </Box>
