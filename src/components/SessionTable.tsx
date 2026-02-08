@@ -44,9 +44,11 @@ function StatusCell({ status }: { status: SessionRow['status'] }) {
 function ActivityCell({
   status,
   lastActive,
+  maxLen,
 }: {
   status: SessionRow['status'];
   lastActive: Date;
+  maxLen: number;
 }) {
   if (status === 'running') {
     return (
@@ -55,7 +57,8 @@ function ActivityCell({
       </Text>
     );
   }
-  return <Text>{formatDistanceToNow(lastActive)} ago</Text>;
+  const text = formatDistanceToNow(lastActive) + ' ago';
+  return <Text>{truncate(text, maxLen)}</Text>;
 }
 
 function pad(str: string, width: number): string {
@@ -104,6 +107,7 @@ export function SessionTable({ sessions }: SessionTableProps) {
             <ActivityCell
               status={session.status}
               lastActive={session.lastActive}
+              maxLen={cols.activity - 1}
             />
           </Box>
           <Text>{pad(String(session.messageCount), cols.messages)}</Text>
