@@ -277,7 +277,12 @@ function fullScan(): SessionRow[] {
         indexData?.projectPath ??
         deriveProjectPath(dir);
       const projectName = resolveProjectName(projectPath);
-      const status = determineStatus(sessionId, cachedActiveIds, filePath);
+      const status = determineStatus(
+        sessionId,
+        cachedActiveIds,
+        filePath,
+        mtimeMs,
+      );
 
       let gitBranch = indexEntry?.gitBranch ?? jsonlMeta?.gitBranch;
       if (!gitBranch || gitBranch === 'HEAD') {
@@ -318,6 +323,7 @@ function quickScan(): SessionRow[] {
           cached.sessionId,
           cachedActiveIds,
           cached.filePath,
+          stat.mtimeMs,
         );
         cached.row = { ...cached.row, lastActive: stat.mtime, status };
       }

@@ -146,11 +146,18 @@ function resolveActiveStatus(filePath: string): SessionStatus {
   }
 }
 
+const RECENT_THRESHOLD = 3000;
+
 export function determineStatus(
   sessionId: string,
   activeSessionIds: Set<string>,
   filePath: string,
+  mtimeMs: number,
 ): SessionStatus {
   if (!activeSessionIds.has(sessionId)) return 'inactive';
-  return resolveActiveStatus(filePath);
+  const status = resolveActiveStatus(filePath);
+  if (status === 'idle' && Date.now() - mtimeMs < RECENT_THRESHOLD) {
+    return 'running';
+  }
+  return status;
 }
