@@ -112,6 +112,7 @@ function resolveActiveStatus(filePath: string): SessionStatus {
         if (nl !== -1) content = content.slice(nl + 1);
       }
       const lines = content.trimEnd().split('\n');
+      const resolvedIds = new Set<string>();
       for (let i = lines.length - 1; i >= 0; i--) {
         let parsed: unknown;
         try {
@@ -121,21 +122,40 @@ function resolveActiveStatus(filePath: string): SessionStatus {
         }
         const entry = parsed as {
           type?: string;
-          message?: { content?: Array<{ type: string }> };
+          message?: {
+            content?: Array<{
+              type: string;
+              id?: string;
+              tool_use_id?: string;
+            }>;
+          };
         };
         const type = entry?.type;
         if (!type || META_TYPES.has(type)) continue;
-        if (
-          type === 'progress' ||
-          type === 'user' ||
-          type === 'queue-operation'
-        )
+        if (type === 'progress' || type === 'queue-operation') return 'running';
+        if (type === 'user') {
+          const items = entry?.message?.content;
+          if (!Array.isArray(items)) return 'running';
+          const results = items.filter((c) => c.type === 'tool_result');
+          if (results.length > 0) {
+            for (const r of results) {
+              if (r.tool_use_id) resolvedIds.add(r.tool_use_id);
+            }
+            continue;
+          }
           return 'running';
+        }
         if (type !== 'assistant') return 'running';
         const contentItems = entry?.message?.content;
         if (!Array.isArray(contentItems)) return 'running';
-        const hasToolUse = contentItems.some((c) => c.type === 'tool_use');
-        if (hasToolUse) return 'waiting';
+        const toolUses = contentItems.filter((c) => c.type === 'tool_use');
+        if (toolUses.length > 0) {
+          const hasUnresolved = toolUses.some(
+            (tu) => !tu.id || !resolvedIds.has(tu.id),
+          );
+          if (hasUnresolved) return 'waiting';
+          continue;
+        }
         const hasText = contentItems.some((c) => c.type === 'text');
         return hasText ? 'idle' : 'running';
       }
