@@ -8,7 +8,7 @@
     "claudpit": "./dist/cli.js"
   },
   "scripts": {
-    "dev": "tsx src/cli.tsx",
+    "dev": "tsx watch src/cli.tsx",
     "build": "tsc && tsc-alias",
     "format": "prettier --write \"src/**/*.{ts,tsx,json}\"",
     "format:check": "prettier --check \"src/**/*.{ts,tsx,json}\"",
