@@ -2,7 +2,7 @@
 
 A terminal dashboard for monitoring active Claude Code sessions in real-time.
 
-![claudpit screenshot](screenshot.png)
+<img width="824" height="148" alt="image" src="https://github.com/user-attachments/assets/f1365c9b-e835-4950-8e38-a5f37ffa1a59" />
 
 ## Features
 
