@@ -59,6 +59,7 @@ npm install
 | Command | Description |
 |---------|-------------|
 | `npm run dev` | Start in development mode with live reload |
+| `npm run dummy` | Launch with dummy data (no real sessions needed) |
 | `npm run build` | Compile TypeScript to `dist/` |
 | `npm run lint` | Run ESLint |
 | `npm run lint:fix` | Run ESLint with auto-fix |
