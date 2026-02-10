@@ -7,6 +7,9 @@
   "bin": {
     "claudpit": "./dist/cli.js"
   },
+  "files": [
+    "dist"
+  ],
   "scripts": {
     "dev": "tsx watch src/cli.tsx",
     "dummy": "tsx src/cli.tsx --dummy",
