@@ -9,6 +9,7 @@
   },
   "scripts": {
     "dev": "tsx watch src/cli.tsx",
+    "dummy": "tsx src/cli.tsx --dummy",
     "build": "tsc && tsc-alias",
     "format": "prettier --write \"src/**/*.{ts,tsx,json}\"",
     "format:check": "prettier --check \"src/**/*.{ts,tsx,json}\"",
@@ -24,7 +25,7 @@
     "sessions"
   ],
   "author": "",
-  "license": "ISC",
+  "license": "MIT",
   "devDependencies": {
     "@eslint/js": "^9.39.2",
     "@trivago/prettier-plugin-sort-imports": "^6.0.2",

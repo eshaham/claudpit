@@ -340,13 +340,68 @@ function fetchSessions(): SessionRow[] {
   return quickScan();
 }
 
-export function useSessions(): SessionRow[] {
+const DUMMY_SESSIONS: SessionRow[] = [
+  {
+    sessionId: 'dummy-1',
+    projectPath: '/home/user/src/weather-api',
+    projectName: 'weather-api',
+    gitBranch: 'add-forecast-endpoint',
+    status: 'running',
+    lastActive: new Date(),
+    messageCount: 34,
+  },
+  {
+    sessionId: 'dummy-2',
+    projectPath: '/home/user/src/taskflow',
+    projectName: 'taskflow',
+    gitBranch: 'migrate-to-postgres',
+    status: 'waiting',
+    lastActive: new Date(Date.now() - 15_000),
+    messageCount: 87,
+  },
+  {
+    sessionId: 'dummy-3',
+    projectPath: '/home/user/src/pixel-ui',
+    projectName: 'pixel-ui',
+    gitBranch: 'date-picker-a11y',
+    status: 'idle',
+    lastActive: new Date(Date.now() - 3 * 60_000),
+    messageCount: 12,
+  },
+  {
+    sessionId: 'dummy-4',
+    projectPath: '/home/user/src/vertex',
+    projectName: 'vertex',
+    gitBranch: 'main',
+    status: 'running',
+    lastActive: new Date(),
+    messageCount: 156,
+  },
+  {
+    sessionId: 'dummy-5',
+    projectPath: '/home/user/src/snapvault',
+    projectName: 'snapvault',
+    gitBranch: 'fix-upload-timeout',
+    status: 'inactive',
+    lastActive: new Date(Date.now() - 2 * 60 * 60_000),
+    messageCount: 45,
+  },
+];
+
+interface UseSessionsOptions {
+  showDummy?: boolean;
+}
+
+export function useSessions(options?: UseSessionsOptions): SessionRow[] {
   const [sessions, setSessions] = useState<SessionRow[]>(() => {
+    if (options?.showDummy) return DUMMY_SESSIONS;
     dirty = false;
     return fetchSessions();
   });
 
   useEffect(() => {
+    if (options?.showDummy) return;
+
     const interval = setInterval(() => {
       const needsFullScan = Date.now() - lastFullScanMs >= FULL_SCAN_INTERVAL;
       if (needsFullScan || dirty) {

@@ -5,9 +5,11 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { SessionTable } from '~/components/SessionTable.js';
 import { useSessions } from '~/hooks/useSessions.js';
 
+const showDummy = process.argv.includes('--dummy');
+
 const App = () => {
   const { exit } = useApp();
-  const sessions = useSessions();
+  const sessions = useSessions({ showDummy });
   const [showInactive, setShowInactive] = useState(false);
 
   const filtered = useMemo(
